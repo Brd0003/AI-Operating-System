@@ -1,6 +1,7 @@
 import os
 import sys
-import requests
+import asyncio
+import httpx
 from langchain_openai import ChatOpenAI
 from langchain_core.messages import SystemMessage, ToolMessage
 from langchain_core.runnables import RunnableConfig
@@ -30,72 +31,111 @@ EXECUTOR_SYS_PROMPT = (
     "Execute dynamic MCP tools securely. Summarize what you executed so the Evaluator can review the outcome."
 )
 
-def get_embedding(text: str) -> list[float]:
-    """Fetch embedding natively from the local LiteLLM/Ollama endpoint."""
+# Root cause of the diagnose.sh 429 burst + "system-agent KeyError: 'data'" crash:
+# ensure_tool_index() used to fire one synchronous, unthrottled embedding call
+# PER MCP TOOL (GitHub's MCP server alone can expose dozens) with no HTTP error
+# handling, against the LITELLM_API_VIRTUAL_KEY_SERVICE_ACCOUNT key, which is
+# capped at RPM 20 in LiteLLM. That blew the budget in under a second, LiteLLM
+# started returning 429s, and response.json()["data"][0]["embedding"] crashed
+# with KeyError on the 429 body (which has no "data" key). Optionally set
+# EMBED_INDEX_RPM in .env to tune this against your actual virtual-key budget.
+EMBED_INDEX_RPM = int(os.environ.get("EMBED_INDEX_RPM", "15"))
+_EMBED_DELAY_SECONDS = 60.0 / max(EMBED_INDEX_RPM, 1)
+
+
+async def get_embedding(client: httpx.AsyncClient, text: str) -> list[float] | None:
+    """Fetch an embedding from the local LiteLLM/Ollama endpoint.
+    Never raises — a failed/rate-limited call returns None so one bad
+    request can't crash the whole indexing pass or executor turn."""
     url = os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1").replace("/v1", "/v1/embeddings")
     headers = {
         "Content-Type": "application/json",
-        "Authorization": f"Bearer {os.environ.get('LITELLM_MASTER_KEY', '')}"
+        "Authorization": f"Bearer {os.environ.get('LITELLM_MASTER_KEY', '')}",
     }
-    response = requests.post(url, json={"model": "ollama/nomic-embed-text:v1.5", "input": text}, headers=headers)
-    return response.json()["data"][0]["embedding"]
-
-def ensure_tool_index(tools: list):
-    """Self-healing: Embeds and indexes all MCP tools into Qdrant if the collection is missing."""
-    if not qdrant.collection_exists(TOOL_COLLECTION):
-        print(f"⚠️ Collection '{TOOL_COLLECTION}' missing. Indexing {len(tools)} MCP tools to Qdrant...", flush=True)
-        qdrant.create_collection(
-            collection_name=TOOL_COLLECTION,
-            vectors_config=VectorParams(size=768, distance=Distance.COSINE),
+    try:
+        response = await client.post(
+            url,
+            json={"model": "ollama/nomic-embed-text:v1.5", "input": text},
+            headers=headers,
+            timeout=30,
         )
-        
-        points = []
-        for i, tool in enumerate(tools):
-            name = getattr(tool, 'name', f"tool_{i}")
-            desc = getattr(tool, 'description', str(tool))
-            
-            # Create a rich semantic string to embed
-            semantic_text = f"Tool Name: {name}. Description: {desc}"
-            vector = get_embedding(semantic_text)
-            
-            points.append(PointStruct(id=i, vector=vector, payload={"name": name, "description": desc}))
-        
-        if points:
-            qdrant.upsert(collection_name=TOOL_COLLECTION, points=points)
-            print(f"✅ Successfully indexed {len(points)} tools into Qdrant.", flush=True)
+        response.raise_for_status()
+        return response.json()["data"][0]["embedding"]
+    except Exception as e:
+        print(f"⚠️ Embedding request failed, skipping: {e}", flush=True)
+        return None
 
-def get_semantic_tools(prompt: str, all_tools: list, top_k: int = 5) -> list:
+
+async def ensure_tool_index(tools: list):
+    """Self-healing: embeds and indexes all MCP tools into Qdrant if the
+    collection is missing. Now rate-limited to EMBED_INDEX_RPM and tolerant
+    of individual embedding failures instead of crashing the whole pass."""
+    if qdrant.collection_exists(TOOL_COLLECTION):
+        return
+
+    print(f"⚠️ Collection '{TOOL_COLLECTION}' missing. Indexing {len(tools)} MCP tools to Qdrant...", flush=True)
+    qdrant.create_collection(
+        collection_name=TOOL_COLLECTION,
+        vectors_config=VectorParams(size=768, distance=Distance.COSINE),
+    )
+
+    points = []
+    async with httpx.AsyncClient() as client:
+        for i, tool in enumerate(tools):
+            name = getattr(tool, "name", f"tool_{i}")
+            desc = getattr(tool, "description", str(tool))
+            semantic_text = f"Tool Name: {name}. Description: {desc}"
+
+            vector = await get_embedding(client, semantic_text)
+            if vector is not None:
+                points.append(PointStruct(id=i, vector=vector, payload={"name": name, "description": desc}))
+
+            if i < len(tools) - 1:
+                await asyncio.sleep(_EMBED_DELAY_SECONDS)
+
+    if points:
+        qdrant.upsert(collection_name=TOOL_COLLECTION, points=points)
+        print(f"✅ Successfully indexed {len(points)}/{len(tools)} tools into Qdrant.", flush=True)
+    else:
+        print("❌ No tools were successfully embedded — collection left empty; will retry next request.", flush=True)
+
+
+async def get_semantic_tools(prompt: str, all_tools: list, top_k: int = 5) -> list:
     """Queries Qdrant to retrieve only the specific tools relevant to the user's prompt."""
     if not all_tools:
         return []
-        
-    ensure_tool_index(all_tools)
-    
-    prompt_vector = get_embedding(prompt)
+
+    await ensure_tool_index(all_tools)
+
+    async with httpx.AsyncClient() as client:
+        prompt_vector = await get_embedding(client, prompt)
+
+    if prompt_vector is None:
+        # Embedding the live query failed (e.g. rate-limited) — fail safe by
+        # handing the executor the full tool set instead of crashing the turn.
+        print("⚠️ Query embedding failed; falling back to full tool set.", flush=True)
+        return all_tools
+
     search_result = qdrant.search(
         collection_name=TOOL_COLLECTION,
         query_vector=prompt_vector,
-        limit=top_k
+        limit=top_k,
     )
-    
-    # Extract the names of the top tools returned by Qdrant
+
     retrieved_names = {hit.payload["name"] for hit in search_result}
-    
-    # Filter the actual executable tool objects based on Qdrant's routing
-    filtered_tools = [t for t in all_tools if getattr(t, 'name', '') in retrieved_names]
-    
+    filtered_tools = [t for t in all_tools if getattr(t, "name", "") in retrieved_names]
+
     print(f"🛡️ Qdrant Routing Active: VRAM protected. Supplying {len(filtered_tools)} highly-relevant tools to LLM.", flush=True)
     return filtered_tools
+
 
 async def executor_node(state: OSState, config: RunnableConfig | None = None):
     config = config or {}
     all_tools = config.get("configurable", {}).get("tools", [])
 
-    # Extract the user's latest objective
     user_prompt = str(state["messages"][-1].content)
-    
-    # Query Qdrant for ONLY the relevant tools
-    safe_tools = get_semantic_tools(user_prompt, all_tools, top_k=5)
+
+    safe_tools = await get_semantic_tools(user_prompt, all_tools, top_k=5)
 
     bound_llm = llm.bind_tools(safe_tools) if safe_tools else llm
 
@@ -108,14 +148,13 @@ async def executor_node(state: OSState, config: RunnableConfig | None = None):
         "evaluation_feedback": "pending",
     }
 
+
 async def tool_runner_node(state: OSState, config: RunnableConfig | None = None):
     """Executes any tool_calls the Executor's LLM just requested against the
     dynamically-loaded MCP tools, and appends the results as ToolMessages so
     the Executor sees them on its next turn."""
     config = config or {}
-    
-    # The runner still has access to ALL tools in memory to execute the action,
-    # but the LLM was only burdened with binding the semantic subset.
+
     tools = config.get("configurable", {}).get("tools", [])
     tools_by_name = {t.name: t for t in tools}
 
@@ -138,6 +177,7 @@ async def tool_runner_node(state: OSState, config: RunnableConfig | None = None)
         results.append(ToolMessage(content=str(output), tool_call_id=call["id"]))
 
     return {"messages": results}
+
 
 def has_pending_tool_calls(state: OSState) -> str:
     last_msg = state["messages"][-1]

@@ -43,6 +43,11 @@ litellm_settings:
 
 router_settings:
   routing_strategy: simple-shuffle
+  # Without this, LiteLLM's `order:` field on the two "j.a.r.v.i.s." deployments
+  # below is NOT guaranteed to be honored under simple-shuffle — meaning traffic
+  # could silently land on the $5-budget NVIDIA fallback instead of always
+  # preferring the local Ollama deployment (order: 1) first.
+  enable_pre_call_checks: true
   allowed_fails_policy:
     RateLimitErrorAllowedFails: 2
     TimeoutErrorAllowedFails: 2

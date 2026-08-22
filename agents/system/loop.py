@@ -44,7 +44,21 @@ async def memory_node(state: OSState, config: RunnableConfig | None = None):
     return {"explicit_memory": context}
 
 async def supervisor_node(state: OSState, config: RunnableConfig | None = None):
-    injected_prompt = f"{load_prompt()}\n\n### EXPLICIT MEMORY CONTEXT:\n{state.get('explicit_memory', 'None')}"
+    config = config or {}
+    tools = config.get("configurable", {}).get("tools", [])
+    if tools:
+        tool_list = "\n".join(
+            f"- {getattr(t, 'name', 'unknown')}: {getattr(t, 'description', '') or 'no description'}"
+            for t in tools
+        )
+    else:
+        tool_list = "(none currently loaded — MCP discovery may have failed at startup; check system-agent logs)"
+
+    injected_prompt = (
+        f"{load_prompt()}\n\n"
+        f"### ACTUALLY BOUND MCP TOOLS (ground truth — never claim a tool beyond this list):\n{tool_list}\n\n"
+        f"### EXPLICIT MEMORY CONTEXT:\n{state.get('explicit_memory', 'None')}"
+    )
     sys_msg = SystemMessage(content=injected_prompt)
     return {"messages": [sys_msg]}
 
