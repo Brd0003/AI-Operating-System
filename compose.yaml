@@ -1,0 +1,13 @@
+include:
+  - compose/kernel.yaml
+  - compose/services/redis.yaml
+  - compose/services/postgres.yaml
+  - compose/services/qdrant.yaml
+  - compose/services/ollama.yaml
+  - compose/services/litellm.yaml
+  - compose/services/open-webui.yaml
+  - compose/services/n8n.yaml
+  - compose/agents.yaml
+  - compose/monitoring.yaml
+  - compose/optional.yaml
+  

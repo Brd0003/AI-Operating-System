@@ -1,0 +1,45 @@
+services:
+  system-agent:
+    container_name: system-agent
+    build:
+      context: /mnt/cache/config/workspace/AI-Operating-System/
+      dockerfile: agents/system/Dockerfile
+    restart: unless-stopped
+    volumes:
+      - /mnt/cache/config/workspace/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/caddy-ca-bundle.pem:ro
+    environment:
+      - TZ=${TZ}
+      - INT_IP_REDIS=${INT_IP_REDIS}
+      - REQUESTS_CA_BUNDLE=/certs/caddy-ca-bundle.pem
+      - SSL_CERT_FILE=/certs/caddy-ca-bundle.pem
+      - REDIS_PASSWORD=${REDIS_PASSWORD}
+      - QDRANT_MCP_URL=${QDRANT_MCP_URL}
+      - FILESYSTEM_MCP_URL=${FILESYSTEM_MCP_URL}
+      - GITHUB_MCP_URL=${GITHUB_MCP_URL}
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+      - LITELLM_MASTER_KEY=${LITELLM_API_VIRTUAL_KEY_SERVICE_ACCOUNT}
+      - LITELLM_BASE_URL=${URL_LITELLM}/v1
+      - AGENT_PORT=10001
+      - AGENT_URL=${AGENT_URL}
+      - SYSTEM_AGENT_KEY=${SYSTEM_AGENT_KEY}
+    depends_on:
+      litellm:
+        condition: service_healthy
+      mcp-filesystem:
+        condition: service_healthy
+      mcp-qdrant:
+        condition: service_healthy
+      mcp-github-health:
+        condition: service_healthy
+    networks:
+      br0:
+        ipv4_address: ${IP_SYSTEM_AGENT}
+        mac_address: ${MAC_SYSTEM_AGENT}
+      nestworks:
+        ipv4_address: ${INT_IP_SYSTEM_AGENT}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 10001))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s

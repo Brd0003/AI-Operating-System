@@ -1,0 +1,10 @@
+name: ai-operating-system
+
+networks:
+  br0:
+    external: true
+  nestworks:
+    external: true
+    name: nestworks_docker_bridge_network
+
+services: {}

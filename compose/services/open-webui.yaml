@@ -1,0 +1,43 @@
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:${VERSION_OPEN_WEBUI:-main}
+    container_name: open-webui
+    restart: unless-stopped
+    environment:
+      - OPENAI_API_BASE_URL=${URL_LITELLM}/v1
+      - OPENAI_API_KEY=${LITELLM_MASTER_KEY}
+      - WEBUI_PORT=8080
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - VECTOR_DB=qdrant
+      - QDRANT_URI=${URL_QDRANT}
+      - DATABASE_URL=postgresql://${OPEN_WEBUI_DB_USER}:${OPEN_WEBUI_DB_PASSWORD}@${INT_IP_DB_SHARED}:5432/open_webui
+      - REQUESTS_CA_BUNDLE=/certs/ca-bundle.pem
+      - SSL_CERT_FILE=/certs/ca-bundle.pem
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - USER_AGENT=Nestworks-JARVIS-Core/1.0
+    #  - CORS_ALLOW_ORIGIN=https://open-webui.${DOMAIN}
+      - CORS_ALLOW_ORIGIN=*
+      - WEBUI_CORS_ALLOWED_ORIGINS=*
+    volumes:
+      - /mnt/cache/appdata/open-webui:/app/backend/data
+      - /mnt/cache/config/workspace/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/ca-bundle.pem:ro
+    networks:
+      br0:
+        ipv4_address: ${IP_OPEN_WEBUI}
+        mac_address: ${MAC_OPEN_WEBUI}
+      nestworks:
+        ipv4_address: ${INT_IP_OPEN_WEBUI}
+    depends_on:
+      postgres-shared:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      litellm:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [ gpu ]

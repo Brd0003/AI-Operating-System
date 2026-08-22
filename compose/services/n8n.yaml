@@ -1,0 +1,74 @@
+services:
+  n8n:
+    image: n8nio/n8n:${VERSION_N8N:-latest}
+    container_name: n8n
+    restart: unless-stopped
+    environment:
+      - NODE_OPTIONS=--dns-result-order=ipv4first
+      - N8N_RUNNERS_MODE=external
+      - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=${INT_IP_N8N}
+      - N8N_RUNNERS_BROKER_PORT=5679
+      - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
+      - DB_TYPE=postgresdb
+      - DB_POSTGRESDB_HOST=${INT_IP_DB_SHARED}
+      - DB_POSTGRESDB_USER=${N8N_DB_USER}
+      - DB_POSTGRESDB_PASSWORD=${N8N_DB_PASSWORD}
+      - DB_POSTGRESDB_DATABASE=n8n
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_USER_MANAGEMENT_JWT_SECRET=${N8N_USER_MANAGEMENT_JWT_SECRET}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_WEBHOOK_URL=${N8N_WEBHOOK_URL}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=https
+      - N8N_PROXY_HOPS=${N8N_PROXY_HOPS}
+      - N8N_BLOCK_PY_NODES=true
+      - N8N_DEFAULT_BINARY_DATA_MODE=filesystem
+      - N8N_RESTRICT_FILE_ACCESS_TO=/data/shared;/home/node/.n8n;/home/node/.n8n/import
+      - LITELLM_API_VIRTUAL_KEY=${LITELLM_API_VIRTUAL_KEY_SERVICE_ACCOUNT}
+      - NODE_EXTRA_CA_CERTS=/certs/caddy-ca-bundle.pem
+    volumes:
+      - /mnt/cache/appdata/n8n:/home/node/.n8n
+      - /mnt/cache/config/workspace/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/caddy-ca-bundle.pem:ro
+    networks:
+      br0:
+        ipv4_address: ${IP_N8N}
+        mac_address: ${MAC_N8N}
+      nestworks:
+        ipv4_address: ${INT_IP_N8N}
+    depends_on:
+      postgres-shared:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://localhost:5678/healthz').then(r => r.ok ? process.exit(0) : process.exit(1)).catch(() => process.exit(1))"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  n8n-runner:
+    image: n8nio/runners:${VERSION_N8N:-latest}
+    container_name: n8n-runner
+    restart: unless-stopped
+    environment:
+      - N8N_RUNNERS_TASK_BROKER_URI=http://${INT_IP_N8N}:5679
+      - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
+      - N8N_RUNNERS_LAUNCHER_LOG_LEVEL=info
+      - N8N_RUNNERS_TASK_TIMEOUT=300
+      - NODE_EXTRA_CA_CERTS=/certs/caddy-ca-bundle.pem
+      - REQUESTS_CA_BUNDLE=/certs/caddy-ca-bundle.pem
+      - SSL_CERT_FILE=/certs/caddy-ca-bundle.pem
+    volumes:
+      - /mnt/cache/config/workspace/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/caddy-ca-bundle.pem:ro
+    networks:
+      br0:
+        ipv4_address: ${IP_N8N_RUNNER}
+        mac_address: ${MAC_N8N_RUNNER}
+      nestworks:
+        ipv4_address: ${INT_IP_N8N_RUNNER}
+    depends_on:
+      n8n:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "ps aux | grep -v grep | grep -q '[r]unner'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5

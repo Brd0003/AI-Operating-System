@@ -1,0 +1,32 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+cd "$(dirname "$0")/.."
+
+COMPOSE="docker compose --env-file .env -f compose.yaml"
+
+case "${1:-}" in
+config)   $COMPOSE config ;;
+validate) $COMPOSE config --quiet ;;
+up)       shift; $COMPOSE up -d "$@" ;;
+down)     $COMPOSE down ;;
+restart)  shift; $COMPOSE restart "$@" ;;
+logs)     shift; $COMPOSE logs -f "$@" ;;
+ps)       $COMPOSE ps ;;
+pull)     $COMPOSE pull ;;
+*)
+cat <<USAGE
+AI Operating System
+
+Usage
+  aos config
+  aos validate
+  aos up
+  aos down
+  aos ps
+  aos logs
+  aos restart
+  aos pull
+USAGE
+;;
+esac

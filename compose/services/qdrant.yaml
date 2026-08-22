@@ -1,0 +1,21 @@
+services:
+  qdrant:
+    image: qdrant/qdrant:${VERSION_QDRANT:-latest}
+    container_name: qdrant
+    restart: unless-stopped
+    environment:
+      - QDRANT__TELEMETRY_DISABLED=true
+      - RUST_LOG=qdrant=error,info
+    volumes:
+      - /mnt/cache/appdata/qdrant-recordsize-16k:/qdrant/storage
+    networks:
+      br0:
+        ipv4_address: ${IP_QDRANT}
+        mac_address: ${MAC_QDRANT}
+      nestworks:
+        ipv4_address: ${INT_IP_QDRANT}
+    healthcheck:
+      test: ["CMD-SHELL", "cat /proc/net/tcp | grep -q '18BD'"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
