@@ -1,0 +1,8 @@
+{
+     "mcpServers": {
+         "mcp-server-qdrant": {
+             "url": "https://mcp.qdrant.tech/mcp/",
+             "transport": "streamable-http"
+         }
+     }
+}

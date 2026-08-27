@@ -9,6 +9,7 @@ services:
       - N8N_RUNNERS_BROKER_LISTEN_ADDRESS=${INT_IP_N8N}
       - N8N_RUNNERS_BROKER_PORT=5679
       - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
+      - N8N_RUNNERS_TASK_TIMEOUT=60
       - DB_TYPE=postgresdb
       - DB_POSTGRESDB_HOST=${INT_IP_DB_SHARED}
       - DB_POSTGRESDB_USER=${N8N_DB_USER}
@@ -52,7 +53,7 @@ services:
       - N8N_RUNNERS_TASK_BROKER_URI=http://${INT_IP_N8N}:5679
       - N8N_RUNNERS_AUTH_TOKEN=${N8N_RUNNERS_AUTH_TOKEN}
       - N8N_RUNNERS_LAUNCHER_LOG_LEVEL=info
-      - N8N_RUNNERS_TASK_TIMEOUT=300
+      - N8N_RUNNERS_TASK_TIMEOUT=60
       - NODE_EXTRA_CA_CERTS=/certs/caddy-ca-bundle.pem
       - REQUESTS_CA_BUNDLE=/certs/caddy-ca-bundle.pem
       - SSL_CERT_FILE=/certs/caddy-ca-bundle.pem

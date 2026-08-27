@@ -1,56 +1,77 @@
 import asyncio
 import os
+import shutil
 
 from langchain_mcp_adapters.client import MultiServerMCPClient
 
+MCP_TOOL_MANIFEST: dict[str, list[str]] = {}
 
 async def initialize_agent_tools():
-    """Load MCP tools from independent services without failing all discovery."""
+    """Load all MCP tools natively using ultra-fast stdio transports."""
 
-    qdrant_url = os.environ.get(
-        "QDRANT_MCP_URL",
-        "http://mcp-qdrant:8000",
-    )
-    filesystem_url = os.environ.get(
-        "FILESYSTEM_MCP_URL",
-        "http://mcp-filesystem:8000",
-    )
-    github_url = os.environ.get(
-        "GITHUB_MCP_URL",
-        "http://mcp-github:8000",
-    )
-    github_token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN")
+    fs_command = shutil.which("rust-mcp-filesystem") or "rust-mcp-filesystem"
+    uvx_command = shutil.which("uvx") or "uvx"
+    npx_command = shutil.which("npx") or "npx"
+    snippets_command = shutil.which("mcp-code-snippets") or "mcp-code-snippets"
+
+    # CRITICAL FIX: Inherit the Docker container's base environment
+    base_env = os.environ.copy()
+
+    # Construct Qdrant Env
+    qdrant_env = base_env.copy()
+    qdrant_env.update({
+        "QDRANT_URL": os.environ.get("URL_QDRANT", "http://172.70.0.152:6333"),
+        "COLLECTION_NAME": "qdrant_explicit_memory",
+        "EMBEDDING_MODEL": "sentence-transformers/all-MiniLM-L6-v2",
+        "HF_TOKEN": os.environ.get("HF_TOKEN", ""),
+    })
+
+    # Construct Code Snippets Env
+    snippets_env = base_env.copy()
+    snippets_env.update({
+        "MCP_PROXY_CONFIG": "/app/mcp_proxy.json",
+        "PROJECT_ROOT_PATH": "/projects",
+    })
 
     connections = {
-        "qdrant": {
-            "transport": "sse",
-            "url": f"{qdrant_url.rstrip('/')}/sse",
-            "headers": {
-                "Host": "localhost:8000",
-            },
-        },
         "filesystem": {
-            "transport": "sse",
-            "url": f"{filesystem_url.rstrip('/')}/sse",
+            "transport": "stdio",
+            "command": fs_command,
+            "args": ["/projects"],
+            "env": base_env
         },
+        "qdrant": {
+            "transport": "stdio",
+            "command": uvx_command,
+            "args": ["mcp-server-qdrant"],
+            "env": qdrant_env
+        },
+        "code-snippets": {
+            "transport": "stdio",
+            "command": snippets_command,
+            "args": [],
+            "env": snippets_env
+        }
     }
 
+    github_token = os.environ.get("GITHUB_PERSONAL_ACCESS_TOKEN")
     if github_token:
+        github_env = base_env.copy()
+        github_env["GITHUB_PERSONAL_ACCESS_TOKEN"] = github_token
         connections["github"] = {
-            "transport": "streamable_http",
-            "url": f"{github_url.rstrip('/')}/mcp",
-            "headers": {
-                "Authorization": f"Bearer {github_token}",
-            },
+            "transport": "stdio",
+            "command": npx_command,
+            "args": ["-y", "@modelcontextprotocol/server-github"],
+            "env": github_env
         }
     else:
-        print(
-            "⚠️ GITHUB_PERSONAL_ACCESS_TOKEN is not set; "
-            "skipping GitHub MCP tool discovery.",
-            flush=True,
-        )
+        print("⚠️ GITHUB_PERSONAL_ACCESS_TOKEN is not set; skipping GitHub MCP.", flush=True)
 
-    client = MultiServerMCPClient(connections)
+    try:
+        client = MultiServerMCPClient(connections)
+    except Exception as e:
+        print(f"❌ Failed to initialize MultiServerMCPClient: {e}", flush=True)
+        return []
 
     results = await asyncio.gather(
         *(client.get_tools(server_name=name) for name in connections),
@@ -61,22 +82,13 @@ async def initialize_agent_tools():
 
     for name, result in zip(connections, results):
         if isinstance(result, BaseException):
-            print(
-                f"⚠️ Warning: MCP server '{name}' failed to load; "
-                f"continuing without it: {result!r}",
-                flush=True,
-            )
+            print(f"⚠️ Warning: Native MCP server '{name}' failed to load: {result!r}", flush=True)
             continue
 
         all_tools.extend(result)
-        print(
-            f"✅ Loaded {len(result)} tool(s) from '{name}'.",
-            flush=True,
-        )
+        MCP_TOOL_MANIFEST[name] = [getattr(t, "name", str(t)) for t in result]
+        print(f"✅ Loaded {len(result)} tool(s) natively from '{name}' via stdio.", flush=True)
 
-    print(
-        f"✅ MCP discovery complete: {len(all_tools)} total tool(s) available.",
-        flush=True,
-    )
+    print(f"✅ Fast MCP discovery complete: {len(all_tools)} total tool(s) bound natively.", flush=True)
 
     return all_tools

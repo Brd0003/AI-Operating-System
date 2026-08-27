@@ -7,11 +7,16 @@ from pydantic import BaseModel, Field
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from agents.system.state import OSState
 
+# Standardized environment variables
+LITELLM_BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1")
+LITELLM_MASTER_KEY = os.environ.get("LITELLM_MASTER_KEY")
+
 llm = ChatOpenAI(
     model="j.a.r.v.i.s.",
-    base_url=os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1"),
-    api_key=os.environ.get("LITELLM_MASTER_KEY"),
-    temperature=0.2
+    base_url=LITELLM_BASE_URL,
+    api_key=LITELLM_MASTER_KEY,
+    temperature=0.2,
+    streaming=True # Enable streaming
 )
 
 class PlanOutput(BaseModel):
@@ -31,11 +36,5 @@ async def planner_node(state: OSState):
     return {
         "active_plan": result.plan_steps,
         "current_agent": "planner",
-        # Root cause of the ROUTER/PLANNER recursion-limit crash: this node used to
-        # return only active_plan/current_agent, never touching "messages". Since
-        # the router only ever looks at state["messages"], it saw an unchanged
-        # conversation on every loop and kept re-deciding the same thing forever.
-        # Appending the plan as a real AIMessage gives the router something new
-        # to react to on the next hop.
         "messages": [AIMessage(content=plan_text, name="jarvis_planner")],
     }

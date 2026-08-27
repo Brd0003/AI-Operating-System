@@ -7,16 +7,11 @@ from langchain_core.messages import SystemMessage
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from agents.system.state import OSState
 
+# Standardized environment variables
 LITELLM_BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1")
 LITELLM_MASTER_KEY = os.environ.get("LITELLM_MASTER_KEY")
 
-# NOTE: LiteLLM's `search_tools:` block in kernel/litellm/config.yaml exposes a
-# SEPARATE REST endpoint, POST /v1/search/<search_tool_name>. It is NOT a
-# chat-completions parameter. The old extra_body={"web_search": True,
-# "search_provider": "brave"} on the ChatOpenAI client did nothing except get
-# forwarded straight through to the underlying Ollama model (drop_params: false
-# in config.yaml), which logged "invalid option provided" for both keys and
-# silently ignored them — so every "research" turn was ungrounded hallucination.
+# LiteLLM's REST endpoint for searching
 SEARCH_ENDPOINT = f"{LITELLM_BASE_URL.rsplit('/v1', 1)[0]}/v1/search/brave-search"
 
 llm = ChatOpenAI(
@@ -24,8 +19,8 @@ llm = ChatOpenAI(
     base_url=LITELLM_BASE_URL,
     api_key=LITELLM_MASTER_KEY,
     temperature=0.2,
+    streaming=True # Enable streaming
 )
-
 
 async def _brave_search(query: str, max_results: int = 5) -> str:
     try:
@@ -40,10 +35,6 @@ async def _brave_search(query: str, max_results: int = 5) -> str:
     except Exception as e:
         return f"[Web search unavailable: {e}]"
 
-    # LiteLLM's documented response shape for /v1/search isn't fully nailed down
-    # here — these fallbacks cover the field-name variants seen across LiteLLM's
-    # search provider docs. Run one manual curl against the endpoint after
-    # deploying and adjust the key names below if results come back empty.
     results = data.get("results") or data.get("web", {}).get("results") or []
     if not results:
         return "[Web search returned no results]"
@@ -56,12 +47,7 @@ async def _brave_search(query: str, max_results: int = 5) -> str:
         lines.append(f"- {title} ({url}): {snippet}")
     return "\n".join(lines)
 
-
 async def research_node(state: OSState):
-    """
-    Runs a real Brave web search via LiteLLM's dedicated /v1/search endpoint,
-    then asks the LLM to synthesize strictly from those results.
-    """
     user_query = str(state["messages"][-1].content)
     search_results = await _brave_search(user_query)
 

@@ -8,11 +8,16 @@ from pydantic import BaseModel, Field
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from agents.system.state import OSState
 
+# Standardized environment variables
+LITELLM_BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1")
+LITELLM_MASTER_KEY = os.environ.get("LITELLM_MASTER_KEY")
+
 llm = ChatOpenAI(
     model="j.a.r.v.i.s.",
-    base_url=os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1"),
-    api_key=os.environ.get("LITELLM_MASTER_KEY"),
-    temperature=0.1
+    base_url=LITELLM_BASE_URL,
+    api_key=LITELLM_MASTER_KEY,
+    temperature=0.1,
+    streaming=True # Enable streaming
 )
 
 ROUTER_SYS_PROMPT = (
@@ -33,9 +38,11 @@ ROUTER_SYS_PROMPT = (
     "  output already answers the request — answer directly in response_to_user.\n"
     "Never claim you lack file or tool access — if the request needs that, route to executor "
     "instead of refusing.\n"
-    "If asked what tools, functions, or MCP connections you have, route to FINISH and answer "
-    "using ONLY the 'ACTUALLY BOUND MCP TOOLS' list injected earlier in this conversation by the "
-    "Supervisor. Never invent tool names, integrations, or services that are not in that list."
+    "If asked what tools, MCP connections, or allowed directories you have, route to EXECUTOR "
+    "so it can call the tools live (e.g. list_allowed_directories) and return ground-truth results. "
+    "Never answer tool-listing questions from the Supervisor's injected text alone — that list "
+    "is a reference, not a substitute for actually calling the tool."
+    "Never invent tool names, integrations, or services that are not in the bound tool list."
 )
 
 class RouterDecision(BaseModel):
@@ -49,10 +56,6 @@ class RouterDecision(BaseModel):
     )
 
 async def router_node(state: OSState):
-    """
-    Router Agent: Acts as a semantic traffic cop to inspect user raw input
-    and return a structured JSON decision to control the LangGraph flow.
-    """
     sys_msg = SystemMessage(content=ROUTER_SYS_PROMPT)
 
     router_llm = llm.with_structured_output(RouterDecision)

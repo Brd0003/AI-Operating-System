@@ -7,29 +7,23 @@ services:
     restart: unless-stopped
     volumes:
       - /mnt/cache/config/workspace/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/caddy-ca-bundle.pem:ro
+      - /mnt/cache/config/workspace/AI-Operating-System:/projects:rw
     environment:
       - TZ=${TZ}
-      - INT_IP_REDIS=${INT_IP_REDIS}
       - REQUESTS_CA_BUNDLE=/certs/caddy-ca-bundle.pem
       - SSL_CERT_FILE=/certs/caddy-ca-bundle.pem
-      - REDIS_PASSWORD=${REDIS_PASSWORD}
-      - QDRANT_MCP_URL=${QDRANT_MCP_URL}
-      - FILESYSTEM_MCP_URL=${FILESYSTEM_MCP_URL}
-      - GITHUB_MCP_URL=${GITHUB_MCP_URL}
       - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
-      - LITELLM_MASTER_KEY=${LITELLM_API_VIRTUAL_KEY_SERVICE_ACCOUNT}
-      - LITELLM_BASE_URL=${URL_LITELLM}/v1
-      - AGENT_PORT=10001
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+      - LITELLM_BASE_URL=${LITELLM_BASE_URL}
+      - AGENT_PORT=${AGENT_PORT}
       - AGENT_URL=${AGENT_URL}
       - SYSTEM_AGENT_KEY=${SYSTEM_AGENT_KEY}
+      - URL_QDRANT=${URL_QDRANT}
+      - URL_QDRANT_GRPC=${URL_QDRANT_GRPC}
     depends_on:
       litellm:
         condition: service_healthy
-      mcp-filesystem:
-        condition: service_healthy
-      mcp-qdrant:
-        condition: service_healthy
-      mcp-github-health:
+      qdrant:
         condition: service_healthy
     networks:
       br0:

@@ -1,6 +1,5 @@
 include:
   - compose/kernel.yaml
-  - compose/services/redis.yaml
   - compose/services/postgres.yaml
   - compose/services/qdrant.yaml
   - compose/services/ollama.yaml
@@ -9,5 +8,5 @@ include:
   - compose/services/n8n.yaml
   - compose/agents.yaml
   - compose/monitoring.yaml
-  - compose/optional.yaml
+
   

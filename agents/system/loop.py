@@ -8,9 +8,8 @@ from langchain_core.runnables import RunnableConfig
 sys.path.append(os.path.abspath(os.path.join(os.path.dirname(__file__), '../../')))
 from agents.system.state import OSState
 
-# --- Re-enabled the Redis Checkpointer ---
-from memory.redis.checkpointer import RedisCheckpointer
-from memory.qdrant.explicit import fetch_explicit_memory
+# --- Replaced Redis with high-speed Qdrant Checkpointer ---
+from memory.qdrant.checkpointer import QdrantCheckpointer
 
 from agents.router.node import router_node
 from agents.planner.node import planner_node
@@ -19,8 +18,10 @@ from agents.executor.node import executor_node, tool_runner_node, has_pending_to
 from agents.evaluator.node import evaluator_node
 from agents.research.node import research_node
 
+# Strict adherence to standard OpenAI/LiteLLM SDK environment variables
 LITELLM_BASE_URL = os.environ.get("LITELLM_BASE_URL", "http://172.70.0.165:4000/v1")
 LITELLM_MASTER_KEY = os.environ.get("LITELLM_MASTER_KEY")
+QDRANT_URL = os.environ.get("URL_QDRANT", "http://172.70.0.152:6333")
 
 llm = ChatOpenAI(
     model="j.a.r.v.i.s.",
@@ -34,15 +35,6 @@ def load_prompt() -> str:
     with open(prompt_path, "r", encoding="utf-8") as f:
         return f.read().strip()
 
-async def memory_node(state: OSState, config: RunnableConfig | None = None):
-    user_input = str(state["messages"][-1].content)
-    try:
-        context = await fetch_explicit_memory(user_input)
-    except Exception as e:
-        print(f"⚠️ Non-fatal memory retrieval skipped: {e}")
-        context = "No previous explicit memory context available."
-    return {"explicit_memory": context}
-
 async def supervisor_node(state: OSState, config: RunnableConfig | None = None):
     config = config or {}
     tools = config.get("configurable", {}).get("tools", [])
@@ -52,12 +44,11 @@ async def supervisor_node(state: OSState, config: RunnableConfig | None = None):
             for t in tools
         )
     else:
-        tool_list = "(none currently loaded — MCP discovery may have failed at startup; check system-agent logs)"
+        tool_list = "(none currently loaded)"
 
     injected_prompt = (
         f"{load_prompt()}\n\n"
-        f"### ACTUALLY BOUND MCP TOOLS (ground truth — never claim a tool beyond this list):\n{tool_list}\n\n"
-        f"### EXPLICIT MEMORY CONTEXT:\n{state.get('explicit_memory', 'None')}"
+        f"### ACTUALLY BOUND MCP TOOLS:\n{tool_list}\n"
     )
     sys_msg = SystemMessage(content=injected_prompt)
     return {"messages": [sys_msg]}
@@ -68,10 +59,22 @@ def route_supervisor(state: OSState):
         return END
     return target
 
+def route_evaluator(state: OSState):
+    current_count = state.get("recursion_count", 0) + 1
+    state["recursion_count"] = current_count
+    
+    if state.get("evaluation_feedback") == "passed":
+        return END
+        
+    if current_count >= 3:
+        print("⚠️ Circuit breaker triggered: Max recursion reached.", flush=True)
+        return END
+        
+    return "router"
+
 def build_system_graph():
     workflow = StateGraph(OSState)
 
-    workflow.add_node("memory", memory_node)
     workflow.add_node("supervisor", supervisor_node)
     workflow.add_node("router", router_node)
     workflow.add_node("planner", planner_node)
@@ -81,8 +84,7 @@ def build_system_graph():
     workflow.add_node("evaluator", evaluator_node)
     workflow.add_node("research", research_node)
 
-    workflow.set_entry_point("memory")
-    workflow.add_edge("memory", "supervisor")
+    workflow.set_entry_point("supervisor")
     workflow.add_edge("supervisor", "router")
     workflow.add_conditional_edges("router", route_supervisor)
     workflow.add_edge("planner", "router")
@@ -92,10 +94,11 @@ def build_system_graph():
         "executor", has_pending_tool_calls, {"tool_runner": "tool_runner", "evaluator": "evaluator"}
     )
     workflow.add_edge("tool_runner", "executor")
-    workflow.add_edge("evaluator", "router")
+    workflow.add_conditional_edges(
+        "evaluator", route_evaluator, {"router": "router", END: END}
+    )
 
-    # --- Redis Memory Restored ---
-    memory_saver = RedisCheckpointer()
+    memory_saver = QdrantCheckpointer(url=QDRANT_URL)
     return workflow.compile(checkpointer=memory_saver)
 
 system_agent = build_system_graph()

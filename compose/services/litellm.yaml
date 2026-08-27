@@ -8,12 +8,17 @@ services:
     ports:
       - "4000:4000"
     environment:
+      # --- CRITICAL GATEWAY OVERRIDE ---
+      # Forces the underlying python core to discard unmapped parameters 
+      # from framework frontends before hitting Ollama/Nvidia proxies.
+      LITELLM_DROP_PARAMS: "True"
+      
+      # --- MODEL ATTRIBUTES & PASSTHROUGHS ---
       SYSTEM_AGENT_KEY: "${SYSTEM_AGENT_KEY}"
       DATABASE_URL: "postgresql://${LITELLM_DB_USER}:${LITELLM_DB_PASSWORD}@${INT_IP_DB_SHARED}:5432/litellm"
       OLLAMA_API_BASE: "http://${INT_IP_OLLAMA}:11434"
       SYSTEM_AGENT_API_BASE: "http://${INT_IP_SYSTEM_AGENT}:10001"
-      STORE_MODEL_IN_DB: "True"
-      # --- Add Cert Trust ---
+      STORE_MODEL_IN_DB: "False"
       REQUESTS_CA_BUNDLE: "/certs/caddy-ca-bundle.pem"
       SSL_CERT_FILE: "/certs/caddy-ca-bundle.pem"
     env_file:
@@ -32,8 +37,8 @@ services:
         condition: service_healthy
     healthcheck:
       test:
-        - CMD-SHELL
-        - python3 -c "import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')"
+        - "CMD-SHELL"
+        - "python3 -c \"import urllib.request; urllib.request.urlopen('http://localhost:4000/health/liveliness')\""
       interval: 30s
       timeout: 10s
       retries: 3
