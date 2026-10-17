@@ -1,0 +1,54 @@
+services:
+  open-webui:
+    image: ghcr.io/open-webui/open-webui:${VERSION_OPEN_WEBUI:-main}
+    container_name: open-webui
+    restart: unless-stopped
+    environment:
+      # ── OpenAI-compat endpoint → system-agent swarm ──────────────────────
+      # Open-WebUI treats this as its "OpenAI" backend. The system-agent
+      # exposes /v1/chat/completions and /v1/models so it appears as a model
+      # named "system-agent" in the model picker.
+      - OPENAI_API_KEY=${SYSTEM_AGENT_KEY}
+      - OPENAI_API_BASE_URL=${SYSTEM_AGENT_API_BASE}/v1
+
+      # ── Ollama direct connection (raw model access) ───────────────────────
+      # Keeps native Ollama models available alongside JARVIS in the picker.
+      - OLLAMA_BASE_URL=${OLLAMA_API_BASE}
+
+      # ── Core WebUI config ─────────────────────────────────────────────────
+      - WEBUI_PORT=8080
+      - WEBUI_SECRET_KEY=${WEBUI_SECRET_KEY}
+      - USER_AGENT=Nestworks-JARVIS-Core/1.0
+      - CORS_ALLOW_ORIGIN=*
+      - WEBUI_CORS_ALLOWED_ORIGINS=*
+
+      # ── Storage backends ──────────────────────────────────────────────────
+      - VECTOR_DB=qdrant
+      - QDRANT_URI=${URL_QDRANT}
+      - DATABASE_URL=postgresql://${OPEN_WEBUI_DB_USER}:${OPEN_WEBUI_DB_PASSWORD}@postgres-shared:5432/open_webui
+
+      # ── Optional cloud fallback (disabled by default) ─────────────────────
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+    volumes:
+      - /mnt/cache/appdata/open-webui:/app/backend/data
+      - /mnt/cache/projects:/projects:rw
+    networks:
+      br0:
+        ipv4_address: ${IP_OPEN_WEBUI}
+        mac_address: ${MAC_OPEN_WEBUI}
+      nestworks:
+        ipv4_address: ${INT_IP_OPEN_WEBUI}
+    depends_on:
+      postgres-shared:
+        condition: service_healthy
+      qdrant:
+        condition: service_healthy
+      system-agent:
+        condition: service_healthy
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]

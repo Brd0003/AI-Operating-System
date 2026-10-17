@@ -1,0 +1,11 @@
+{
+  "domain": "jarvis_assist",
+  "name": "J.A.R.V.I.S. Assist",
+  "version": "1.0.0",
+  "documentation": "https://github.com/Brd0003/AI-Operating-System",
+  "dependencies": ["conversation"],
+  "codeowners": ["@Brd0003"],
+  "requirements": [],
+  "config_flow": true,
+  "iot_class": "local_polling"
+}

@@ -1,0 +1,82 @@
+services:
+  hermes-agent:
+    image: nousresearch/hermes-agent:latest
+    container_name: hermes-agent
+    hostname: hermes-agent
+    restart: unless-stopped
+    command: gateway run
+    environment:
+      TZ: America/Chicago
+      HERMES_HOME: /opt/data
+      HERMES_UID: "99"
+      HERMES_GID: "100"
+      LITELLM_API_BASE: http://172.70.0.170:10001/v1
+      OLLAMA_HOST: http://172.70.0.161:11434
+      QDRANT_HOST: 172.70.0.152
+      QDRANT_PORT: 6333
+      NVIDIA_VISIBLE_DEVICES: all
+      NVIDIA_DRIVER_CAPABILITIES: compute,utility
+      API_SERVER_ENABLED: true
+      API_SERVER_HOST: 0.0.0.0
+      API_SERVER_CORS_ORIGINS: '*'
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu, compute, utility]
+    volumes:
+      - /mnt/cache/appdata/hermes-agent/data:/opt/data
+      - hermes_src:/opt/hermes
+      - /mnt/cache/projects:/projects:rw
+    networks:
+      br0:
+        ipv4_address: 10.70.10.168
+        mac_address: 02:70:10:00:01:68
+      nestworks:
+        ipv4_address: 172.70.0.168
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8642/health]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  hermes-webui:
+    image: ghcr.io/nesquena/hermes-webui:latest
+    container_name: hermes-webui
+    hostname: hermes-webui
+    restart: unless-stopped
+    ports:
+      - "8787:8787"
+    environment:
+      TZ: America/Chicago
+      HERMES_API_URL: http://10.70.10.168:8642
+      HERMES_HOME: /home/hermeswebui/.hermes
+      HERMES_WEBUI_HOST: "0.0.0.0"
+      HERMES_WEBUI_PORT: "8787"
+      HERMES_WEBUI_STATE_DIR: /home/hermeswebui/.hermes/webui
+      WANTED_UID: "99"
+      WANTED_GID: "100"
+      HERMES_WEBUI_AUTO_INSTALL: "1"
+      UV_PYTHON: "3.14"
+    depends_on:
+      - hermes-agent
+    volumes:
+      - /mnt/cache/appdata/hermes-agent/data:/home/hermeswebui/.hermes
+      - hermes_src:/home/hermeswebui/.hermes/hermes-agent:rw
+      - /mnt/cache/projects:/workspace:rw
+    networks:
+      br0:
+        ipv4_address: 10.70.10.169
+        mac_address: 02:70:10:00:01:69
+      nestworks:
+        ipv4_address: 172.70.0.169
+    healthcheck:
+      test: [CMD, curl, -f, http://localhost:8787]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+volumes:
+  hermes_src:

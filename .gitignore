@@ -1,0 +1,113 @@
+# ============================================================================
+# Global_Policy_Enforcement sync file: .gitignore
+# SOURCE_DIR: /mnt/cache/Global_Policy_Enforcement
+# User Script Sync File: /boot/config/plugins/user.scripts/scripts/Global_Policy_Enforcement
+# ============================================================================
+
+# 1. Host Scripts & Local Automation Scripts (Host-Only / Non-Commit)
+/create_.env.example.sh
+/safe_commit.sh
+/auto_migrate_env.sh
+/diagnose.sh
+/export_safe_env.sh
+/volume_mapper.sh
+/config_validator.sh
+/gather_context.sh
+/example.gather_context.sh
+/autostart
+/compose_infrastructure_auditor.sh
+/app_config_validator.sh
+
+# 2. Environment Variables & Secrets (CRITICAL)
+.env
+.env.*
+env/
+env/.env
+*.secret
+*.token
+
+# 3. Security & Credentials
+.certs/
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.pub
+
+# 4. AI, LLM & Vector Database Artifacts
+.cache/
+.chroma/
+.faiss/
+.qdrant/
+*.db
+*.sqlite
+models/
+embeddings/
+
+# 5. Python / LangGraph Artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+.venv/
+venv/
+pip-log.txt
+pip-delete-this-directory.txt
+
+# 6. Node / JavaScript Artifacts
+node_modules/
+
+# 7. Docker, Compose, & Hypervisors
+.docker/
+docker-compose.override.yml
+*.qcow2
+*.img
+*.iso
+
+# 8. OS & Editor Artifacts
+.DS_Store
+.vscode/
+.idea/
+*.swp
+*.swo
+.AppleDouble
+.LSOverride
+.fseventsd
+.Spotlight-V100
+.Thumbs.db
+
+# 9. Script Output & Workspace Diagnostics
+*.log
+/$OUTPUT_FILE
+/project_name
+/system_manifest_&_infrastructure_profile.md
+/markdown_output.md
+/last_result.json
+/started_at
+/has_build
+/name
+/last_cmd.log
+/test_write.txt
+
+# ============================================================================
+# EXCEPTIONS (Only public-safe environment schema templates allowed)
+# ============================================================================
+!.env.example
+!config/.env.example

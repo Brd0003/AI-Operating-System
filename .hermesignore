@@ -1,0 +1,114 @@
+# ============================================================================
+# Global_Policy_Enforcement sync file: .hermesignore
+# SOURCE_DIR: /mnt/cache/Global_Policy_Enforcement
+# User Script Sync File: /boot/config/plugins/user.scripts/scripts/Global_Policy_Enforcement
+# ============================================================================
+# 1. Self & Policy Tooling Exclusions
+.git/
+.gitignore
+.dockerignore
+.geminiignore
+.claudeignore
+.antigravityignore
+.hermesignore
+
+# 2. Host-Level Management Scripts & Local Diagnostics
+/create_.env.example.sh
+/safe_commit.sh
+/auto_migrate_env.sh
+/diagnose.sh
+/export_safe_env.sh
+/volume_mapper.sh
+/config_validator.sh
+/autostart
+/started_at
+/has_build
+/name
+/compose_infrastructure_auditor.sh
+/example.gather_context.sh
+/gather_context.sh
+/app_config_validator.sh
+
+# 3. Critical Secret & Credential Protections (Never feed secrets to AI context)
+.env
+.env.*
+env/
+env/.env
+*.secret
+*.token
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.pub
+.certs/
+
+# 4. Third-Party Bloat & Lockfiles
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.venv/
+venv/
+pip-log.txt
+lib/
+lib64/
+build/
+dist/
+
+# 5. Compiled Code & Local Binaries
+*.so
+*.dll
+*.exe
+*.bin
+*.py[cod]
+*$py.class
+
+# 6. Media Assets & Document Binaries
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.mp4
+*.mp3
+*.pdf
+*.zip
+*.tar.gz
+*.7z
+
+# 7. AI Models, Vector Indexes & Application States
+.cache/
+.chroma/
+.faiss/
+.qdrant/
+*.db
+*.sqlite
+models/
+embeddings/
+
+# 8. Unraid, macOS, & Editor Metadata
+.DS_Store
+.vscode/
+.idea/
+.fseventsd
+.Spotlight-V100
+.Thumbs.db
+*.qcow2
+*.img
+*.iso
+
+# 9. Local Output logs & System Summaries
+*.log
+/last_cmd.log
+/last_result.json
+/system_manifest_&_infrastructure_profile.md
+/markdown_output.md
+
+# ============================================================================
+# EXCEPTIONS 
+# ============================================================================
+!.env.example
+!config/.env.example

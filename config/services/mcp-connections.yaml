@@ -1,0 +1,104 @@
+services:
+  mcp-github:
+    image: ghcr.io/github/github-mcp-server:${VERSION_MCP_GITHUB:-latest}
+    container_name: mcp-github
+    restart: unless-stopped
+    command: ["http"]
+    volumes:
+      - /mnt/cache/projects/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/caddy-ca-bundle.pem:ro
+    environment:
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN:-}
+      - PORT=8082
+      - NODE_EXTRA_CA_CERTS=/certs/caddy-ca-bundle.pem
+    ports:
+      - "8082:8082"
+    networks:
+      br0:
+        ipv4_address: ${IP_MCP_GITHUB}
+        mac_address: ${MAC_MCP_GITHUB}
+      nestworks:
+        ipv4_address: ${INT_IP_MCP_GITHUB}
+
+
+  mcp-filesystem:
+    build:
+      context: /mnt/cache/projects/AI-Operating-System/
+      dockerfile: config/services/mcp-filesystem.Dockerfile
+    container_name: mcp-filesystem
+    restart: unless-stopped
+    volumes:
+      - /mnt/cache/projects:/projects:rw
+      - /mnt/cache/projects/AI-Operating-System/.certs/caddy-ca-bundle.pem:/certs/caddy-ca-bundle.pem:ro
+    environment:
+      - ALLOW_WRITE=${ALLOW_WRITE:-true}
+      - ENABLE_ROOTS=${ENABLE_ROOTS:-false}
+      - NODE_EXTRA_CA_CERTS=/certs/caddy-ca-bundle.pem
+    networks:
+      br0:
+        ipv4_address: ${IP_MCP_FILESYSTEM}
+        mac_address: ${MAC_MCP_FILESYSTEM}
+      nestworks:
+        ipv4_address: ${INT_IP_MCP_FILESYSTEM}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 8000))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s
+
+  mcp-qdrant:
+    build:
+      context: /mnt/cache/projects/AI-Operating-System/
+      dockerfile: config/services/mcp-qdrant.Dockerfile
+    container_name: mcp-qdrant
+    restart: unless-stopped
+    environment:
+      - QDRANT_URL=http://qdrant:6333
+      - COLLECTION_NAME=qdrant_explicit_memory
+      - EMBEDDING_MODEL=sentence-transformers/all-MiniLM-L6-v2
+      - HF_TOKEN=${HF_TOKEN:-}
+      # Plain HTTP to qdrant on internal network — no custom CA needed.
+      # Unsetting these prevents httpx/requests from picking up the Caddy CA
+      # path (which resolves to a directory in this container) and crashing.
+      - REQUESTS_CA_BUNDLE=
+      - SSL_CERT_FILE=
+    networks:
+      br0:
+        ipv4_address: ${IP_MCP_QDRANT}
+        mac_address: ${MAC_MCP_QDRANT}
+      nestworks:
+        ipv4_address: ${INT_IP_MCP_QDRANT}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 8000))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 120s
+
+  mcp-code-snippets:
+    build:
+      context: /mnt/cache/projects/AI-Operating-System/
+      dockerfile: config/services/mcp-snippets.Dockerfile
+    container_name: mcp-code-snippets
+    restart: unless-stopped
+    volumes:
+      - /mnt/cache/projects:/projects:rw
+    environment:
+      - PROJECT_ROOT_PATH=/projects
+      # uvx fetches mcp-code-snippets from PyPI over public TLS.
+      # The Caddy CA is not in its trust store and the cert file isn't
+      # mounted — unsetting prevents uv from rejecting all TLS connections.
+      - REQUESTS_CA_BUNDLE=
+      - SSL_CERT_FILE=
+    networks:
+      br0:
+        ipv4_address: ${IP_MCP_CODE_SNIPPETS}
+        mac_address: ${MAC_MCP_CODE_SNIPPETS}
+      nestworks:
+        ipv4_address: ${INT_IP_MCP_CODE_SNIPPETS}
+    healthcheck:
+      test: ["CMD", "python", "-c", "import socket; s = socket.socket(); s.settimeout(2); s.connect(('127.0.0.1', 8000))"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 25s

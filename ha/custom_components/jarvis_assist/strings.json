@@ -1,0 +1,24 @@
+{
+  "config": {
+    "step": {
+      "user": {
+        "title": "Connect to J.A.R.V.I.S.",
+        "description": "Enter the system-agent URL and API key from your Nestworks stack.",
+        "data": {
+          "base_url": "Agent base URL (e.g. http://10.70.10.170:10001)",
+          "api_key": "SYSTEM_AGENT_KEY",
+          "model": "Model name (default: system-agent)",
+          "timeout": "Request timeout in seconds"
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Cannot connect to the system-agent — verify it is running and the URL is correct.",
+      "invalid_auth": "Invalid API key — check SYSTEM_AGENT_KEY in your .env.",
+      "unknown": "An unexpected error occurred."
+    },
+    "abort": {
+      "already_configured": "J.A.R.V.I.S. is already configured."
+    }
+  }
+}

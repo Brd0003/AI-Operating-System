@@ -1,0 +1,119 @@
+# ============================================================================
+# Global_Policy_Enforcement sync file: .antigravityignore  
+# SOURCE_DIR: /mnt/cache/Global_Policy_Enforcement
+# User Script Sync File: /boot/config/plugins/user.scripts/scripts/Global_Policy_Enforcement
+# ============================================================================
+# 1. Base Framework Protections & Ignore Files
+.git/
+.gitignore
+.dockerignore
+.geminiignore
+.claudeignore
+.antigravityignore
+.hermesignore
+
+# 2. ANTIGRAVITY INTERNAL ENGINE EXCEPTION (CRITICAL)
+# Prevent general hidden folders from blocking the internal agent structure
+!/**/.agent/
+!/**/.agent/**
+
+# 3. Host-Level Management Scripts & Local Diagnostics
+/create_.env.example.sh
+/safe_commit.sh
+/auto_migrate_env.sh
+/diagnose.sh
+/export_safe_env.sh
+/volume_mapper.sh
+/config_validator.sh
+/autostart
+/started_at
+/has_build
+/name
+/compose_infrastructure_auditor.sh
+/example.gather_context.sh
+/gather_context.sh
+/app_config_validator.sh
+
+# 4. Environment Variables & Credentials (Never expose secrets to agents)
+.env
+.env.*
+env/
+env/.env
+*.secret
+*.token
+*.pem
+*.key
+*.crt
+*.pfx
+*.p12
+*.pub
+.certs/
+
+# 5. Third-Party Libraries & Package Bloat
+node_modules/
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
+.venv/
+venv/
+pip-log.txt
+lib/
+lib64/
+build/
+dist/
+
+# 6. Compiled Binary Assets & Objects
+*.so
+*.dll
+*.exe
+*.bin
+*.py[cod]
+*$py.class
+
+# 7. Unparseable Media Assets & Compressed Archives
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.svg
+*.ico
+*.mp4
+*.mp3
+*.pdf
+*.zip
+*.tar.gz
+*.7z
+
+# 8. AI Engine Weights, Vector Databases & Data Stores
+.cache/
+.chroma/
+.faiss/
+.qdrant/
+*.db
+*.sqlite
+models/
+embeddings/
+
+# 9. Unraid, macOS, & IDE State Tracking Metadata
+.DS_Store
+.vscode/
+.idea/
+.fseventsd
+.Spotlight-V100
+.Thumbs.db
+*.qcow2
+*.img
+*.iso
+
+# 10. Log Rotations & System Manifests
+*.log
+/last_cmd.log
+/last_result.json
+/system_manifest_&_infrastructure_profile.md
+/markdown_output.md
+
+# ============================================================================
+# EXCEPTIONS 
+# ============================================================================
+!.env.example
+!config/.env.example

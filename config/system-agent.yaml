@@ -1,0 +1,61 @@
+services:
+  system-agent:
+    container_name: system-agent
+    build:
+      context: /mnt/cache/projects/AI-Operating-System/
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    volumes:
+      - /mnt/cache/projects/AI-Operating-System/src:/app/src:rw
+    environment:
+      - TZ=${TZ}
+      - PYTHONPATH=/app/src
+      - FAST_LANGGRAPH_AUTO_PATCH=1
+      - GITHUB_PERSONAL_ACCESS_TOKEN=${GITHUB_PERSONAL_ACCESS_TOKEN}
+      - OLLAMA_API_BASE=${OLLAMA_API_BASE}
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - NVIDIA_API_BASE=${NVIDIA_API_BASE}
+      - SYSTEM_AGENT_API_BASE=${SYSTEM_AGENT_API_BASE}
+      - AGENT_PORT=${AGENT_PORT}
+      - AGENT_URL=${AGENT_URL}
+      - SYSTEM_AGENT_KEY=${SYSTEM_AGENT_KEY}
+      - URL_QDRANT=${URL_QDRANT}
+      - URL_QDRANT_GRPC=${URL_QDRANT_GRPC}
+      # MCP URLs expanded inline — Python's os.environ does not perform
+      # shell-style ${VAR} substitution, so nested references in .env are
+      # never resolved when read directly by the application.
+      - URL_MCP_FILESYSTEM=http://172.70.0.176:8000
+      - URL_MCP_QDRANT=http://172.70.0.175:8000
+      - URL_MCP_CODE_SNIPPETS=http://172.70.0.174:8000
+      - URL_MCP_GITHUB=http://172.70.0.177:8082
+      - HF_TOKEN=${HF_TOKEN}
+      - ALLOW_WRITE=${ALLOW_WRITE:-false}
+      - ENABLE_ROOTS=${ENABLE_ROOTS:-false}
+      - INT_IP_MCP_GITHUB=${INT_IP_MCP_GITHUB}
+      - MCP_GITHUB_PORT=8082
+      # Live integrations (HA + n8n)
+      - URL_HOME_ASSISTANT=${URL_HOME_ASSISTANT}
+      - HA_LONG_LIVED_TOKEN=${HA_LONG_LIVED_TOKEN}
+      - N8N_MCP_URL=${N8N_MCP_URL}
+      - N8N_API_KEY=${N8N_API_KEY}
+      # Optional: web search for the research agent
+      - SEARCH_ENDPOINT=${SEARCH_ENDPOINT}
+      - LITELLM_MASTER_KEY=${LITELLM_MASTER_KEY}
+    depends_on:
+      qdrant:
+        condition: service_healthy
+      ollama:
+        condition: service_healthy
+    networks:
+      br0:
+        ipv4_address: ${IP_SYSTEM_AGENT}
+        mac_address: ${MAC_SYSTEM_AGENT}
+      nestworks:
+        ipv4_address: ${INT_IP_SYSTEM_AGENT}
+    healthcheck:
+      test: ["CMD", "python", "-c",
+             "import urllib.request, sys; r=urllib.request.urlopen('http://127.0.0.1:10001/health', timeout=2); sys.exit(0 if r.status==200 else 1)"]
+      interval: 15s
+      timeout: 5s
+      retries: 5
+      start_period: 60s

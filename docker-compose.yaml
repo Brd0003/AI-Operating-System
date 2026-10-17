@@ -1,0 +1,11 @@
+include:
+  - config/services/postgres.yaml
+  - config/services/qdrant.yaml
+  - config/services/ollama.yaml
+  - config/services/open-webui.yaml
+  - config/services/n8n.yaml
+  - config/services/mcp-connections.yaml
+  - config/services/hermes.yaml
+  - config/system-agent.yaml
+  - config/monitoring.yaml
+  - config/kernel.yaml

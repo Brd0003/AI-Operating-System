@@ -1,0 +1,25 @@
+services:
+  ollama:
+    image: ollama/ollama:${VERSION_OLLAMA:-latest}
+    container_name: ollama
+    restart: unless-stopped
+    networks:
+      br0:
+        ipv4_address: ${IP_OLLAMA}
+        mac_address: ${MAC_OLLAMA}
+      nestworks:
+        ipv4_address: ${INT_IP_OLLAMA}
+    volumes:
+      - /mnt/cache/appdata/ollama:/root/.ollama
+    deploy:
+      resources:
+        reservations:
+          devices:
+            - driver: nvidia
+              count: 1
+              capabilities: [gpu]
+    healthcheck:
+      test: ["CMD", "ollama", "ps"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
