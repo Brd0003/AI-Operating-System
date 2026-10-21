@@ -32,10 +32,10 @@ services:
       - /mnt/cache/projects:/projects:rw
     networks:
       br0:
-        ipv4_address: 10.70.10.168
-        mac_address: 02:70:10:00:01:68
+        ipv4_address: ${IP_HERMES_AGENT}
+        mac_address: ${MAC_HERMES_AGENT}
       nestworks:
-        ipv4_address: 172.70.0.168
+        ipv4_address: ${INT_IP_HERMES_AGENT}
     healthcheck:
       test: [CMD, curl, -f, http://localhost:8642/health]
       interval: 30s
@@ -51,7 +51,7 @@ services:
       - "8787:8787"
     environment:
       TZ: America/Chicago
-      HERMES_API_URL: http://10.70.10.168:8642
+      HERMES_API_URL: http://${IP_HERMES_AGENT}:8642
       HERMES_HOME: /home/hermeswebui/.hermes
       HERMES_WEBUI_HOST: "0.0.0.0"
       HERMES_WEBUI_PORT: "8787"
@@ -68,10 +68,10 @@ services:
       - /mnt/cache/projects:/workspace:rw
     networks:
       br0:
-        ipv4_address: 10.70.10.169
-        mac_address: 02:70:10:00:01:69
+        ipv4_address: ${IP_HERMES_WEBUI}
+        mac_address: ${MAC_HERMES_WEBUI}
       nestworks:
-        ipv4_address: 172.70.0.169
+        ipv4_address: ${INT_IP_HERMES_WEBUI}
     healthcheck:
       test: [CMD, curl, -f, http://localhost:8787]
       interval: 30s
